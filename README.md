@@ -15,7 +15,7 @@
 | 偏移 | 类型 | 内容 |
 |---:|---|---|
 | 0 | `int16 LE` | SensorBias，单位mV，范围-600～600 |
-| 2 | `uint16 LE` | SamplePeriod，单位ms，范围10～30000 |
+| 2 | `uint16 LE` | SamplePeriod，单位ms，范围1～30000 |
 
 `GET_AMP_CONFIG (0x11)`无请求Payload，成功响应返回相同的4字节参数。
 
