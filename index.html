@@ -543,7 +543,9 @@
               request.retries += 1;
               transmitPendingRequest(request);
             } else {
-              const error = new Error(`命令应答超时，已重试${MAX_REQUEST_RETRIES}次`);
+              const error = new Error(
+                `命令应答超时，已重试${MAX_REQUEST_RETRIES}次；请确认蓝牙模块UART与固件一致（本版本默认9600 baud）`
+              );
               rejectPendingRequest(error);
             }
           }, REQUEST_TIMEOUT_MS);

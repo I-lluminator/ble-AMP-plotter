@@ -32,4 +32,4 @@ A5 + point(u16 LE) + current_nA(i32 LE) + checksum + 5A
 3. 根据BLE模块修改FFE0/FFE1 UUID。
 4. 连接后读取参数，停止状态下应用新参数，再启动检测。
 
-注意：固件默认USART1波特率为115200，BLE模块UART侧必须配置一致。
+注意：为兼容原工程及常见BLE透传模块，固件默认USART1波特率为9600，BLE模块UART侧必须配置一致。若要持续传输100 Hz数据，建议先把BLE模块改为115200，再把`Hardware/Bluetooth.h`中的`BT_UART_BAUDRATE`同步改为115200。
