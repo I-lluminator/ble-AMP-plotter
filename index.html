@@ -317,7 +317,7 @@
           <input id="sensorBias" type="number" value="100" min="-600" max="600" step="1" inputmode="numeric">
         </label>
         <label>采样周期 AMP_SAMPLE_PERIOD_S（ms）
-          <input id="samplePeriod" type="number" value="1000" min="1" max="30000" step="1" inputmode="numeric">
+          <input id="samplePeriod" type="number" value="1000" min="10" max="30000" step="1" inputmode="numeric">
         </label>
       </div>
       <div class="toolbar" style="margin-top: 11px">
@@ -381,6 +381,8 @@
     const COMMAND_GET_AMP_CONFIG = 0x11;
     const REQUEST_TIMEOUT_MS = 800;
     const MAX_REQUEST_RETRIES = 2;
+    const STOP_WAKE_DELAY_MS = 30;
+    const STOP_WAKE_PREAMBLE = new Uint8Array(10).fill(0xFF);
     const STATUS_OK = 0x00;
 
     const elements = {
@@ -534,6 +536,9 @@
 
     async function transmitPendingRequest(request) {
       try {
+        /* PA10 uses the first UART start bit to wake STM32 from STOP. */
+        await writeControlFrame(STOP_WAKE_PREAMBLE);
+        await new Promise(resolve => setTimeout(resolve, STOP_WAKE_DELAY_MS));
         await writeControlFrame(request.frame);
         if (pendingRequest === request) {
           clearTimeout(request.timer);
@@ -676,10 +681,9 @@
     async function startMeasurement() {
       try {
         elements.startButton.disabled = true;
-        clearChart();
         const response = await sendProtocolCommand(COMMAND_START);
         measurementRunning = response.data[0] === 0x01;
-        
+        clearChart();
         setMessage('STM32已确认开始安培法检测，正在等待电流数据。');
       } catch (error) {
         if (error.data && error.data[0] === 0x01) {
@@ -745,7 +749,7 @@
         setParameterStatus('SensorBias必须在-600～600 mV范围内。', true);
         return;
       }
-      if (samplePeriod < 1 || samplePeriod > 30000) {
+      if (samplePeriod < 10 || samplePeriod > 30000) {
         setParameterStatus('采样周期必须在10～30000 ms范围内。', true);
         return;
       }
