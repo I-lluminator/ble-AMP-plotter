@@ -317,7 +317,7 @@
           <input id="sensorBias" type="number" value="100" min="-600" max="600" step="1" inputmode="numeric">
         </label>
         <label>采样周期 AMP_SAMPLE_PERIOD_S（ms）
-          <input id="samplePeriod" type="number" value="1000" min="10" max="30000" step="1" inputmode="numeric">
+          <input id="samplePeriod" type="number" value="1000" min="1" max="30000" step="1" inputmode="numeric">
         </label>
       </div>
       <div class="toolbar" style="margin-top: 11px">
@@ -749,7 +749,7 @@
         setParameterStatus('SensorBias必须在-600～600 mV范围内。', true);
         return;
       }
-      if (samplePeriod < 10 || samplePeriod > 30000) {
+      if (samplePeriod < 1 || samplePeriod > 30000) {
         setParameterStatus('采样周期必须在10～30000 ms范围内。', true);
         return;
       }
