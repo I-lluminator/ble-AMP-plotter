@@ -681,9 +681,10 @@
     async function startMeasurement() {
       try {
         elements.startButton.disabled = true;
+        clearChart();
         const response = await sendProtocolCommand(COMMAND_START);
         measurementRunning = response.data[0] === 0x01;
-        clearChart();
+        
         setMessage('STM32已确认开始安培法检测，正在等待电流数据。');
       } catch (error) {
         if (error.data && error.data[0] === 0x01) {
