@@ -291,6 +291,7 @@
         <button id="disconnectButton" type="button" disabled>断开</button>
         <button id="startButton" class="primary" type="button" disabled>开始检测</button>
         <button id="stopButton" class="stop" type="button" disabled>停止检测</button>
+        <button id="standbyButton" class="stop" type="button" disabled>长期关机</button>
         <button id="clearButton" type="button">清空曲线</button>
         <p id="message" class="message">请使用安卓 Chrome，并通过 HTTPS 打开本页。</p>
       </div>
@@ -317,7 +318,7 @@
           <input id="sensorBias" type="number" value="100" min="-600" max="600" step="1" inputmode="numeric">
         </label>
         <label>采样周期 AMP_SAMPLE_PERIOD_S（ms）
-          <input id="samplePeriod" type="number" value="1000" min="1" max="30000" step="1" inputmode="numeric">
+          <input id="samplePeriod" type="number" value="1000" min="10" max="30000" step="1" inputmode="numeric">
         </label>
       </div>
       <div class="toolbar" style="margin-top: 11px">
@@ -377,6 +378,7 @@
     const MAX_PLOT_POINTS = 5000;
     const COMMAND_START = 0x01;
     const COMMAND_STOP = 0x02;
+    const COMMAND_ENTER_STANDBY = 0x03;
     const COMMAND_SET_AMP_CONFIG = 0x10;
     const COMMAND_GET_AMP_CONFIG = 0x11;
     const REQUEST_TIMEOUT_MS = 800;
@@ -393,6 +395,7 @@
       disconnectButton: document.getElementById('disconnectButton'),
       startButton: document.getElementById('startButton'),
       stopButton: document.getElementById('stopButton'),
+      standbyButton: document.getElementById('standbyButton'),
       clearButton: document.getElementById('clearButton'),
       serviceUuid: document.getElementById('serviceUuid'),
       characteristicUuid: document.getElementById('characteristicUuid'),
@@ -427,6 +430,7 @@
       : Date.now() & 0xFF;
     let pendingRequest = null;
     let measurementRunning = false;
+    let standbyDisconnectExpected = false;
     let pointWrapOffset = 0;
     let lastRawPoint = null;
 
@@ -452,6 +456,7 @@
     function setControlButtons(enabled) {
       elements.startButton.disabled = !enabled;
       elements.stopButton.disabled = !enabled;
+      elements.standbyButton.disabled = !enabled;
       elements.refreshConfigButton.disabled = !enabled;
       elements.applyConfigButton.disabled = !enabled;
       elements.sensorBias.disabled = !enabled;
@@ -665,6 +670,8 @@
     }
 
     function handleDisconnected() {
+      const enteredStandby = standbyDisconnectExpected;
+      standbyDisconnectExpected = false;
       rejectPendingRequest(new Error('BLE连接已断开'));
       notifyCharacteristic = null;
       controlCharacteristic = null;
@@ -674,17 +681,18 @@
       elements.disconnectButton.disabled = true;
       setControlButtons(false);
       setStatus('', '未连接');
-      setMessage('BLE 已断开，可重新连接。');
+      setMessage(enteredStandby
+        ? 'STM32已进入长期关机，只能按NRST复位键重新启动。'
+        : 'BLE 已断开，可重新连接。');
       setParameterStatus('连接后将自动读取STM32中的当前参数。');
     }
 
     async function startMeasurement() {
       try {
         elements.startButton.disabled = true;
-        clearChart();
         const response = await sendProtocolCommand(COMMAND_START);
         measurementRunning = response.data[0] === 0x01;
-        
+        clearChart();
         setMessage('STM32已确认开始安培法检测，正在等待电流数据。');
       } catch (error) {
         if (error.data && error.data[0] === 0x01) {
@@ -706,6 +714,31 @@
         setMessage(`停止失败：${error.message || error}`, true);
       } finally {
         setControlButtons(Boolean(controlCharacteristic));
+      }
+    }
+
+    async function enterStandby() {
+      if (measurementRunning) {
+        setMessage('请先停止检测，再执行长期关机。', true);
+        return;
+      }
+
+      if (!window.confirm('确认进入长期关机？进入后只能按STM32的NRST复位键重新启动。')) {
+        return;
+      }
+
+      try {
+        elements.standbyButton.disabled = true;
+        await sendProtocolCommand(COMMAND_ENTER_STANDBY);
+        standbyDisconnectExpected = true;
+        setMessage('长期关机命令已确认，正在断开BLE。');
+        disconnectBle();
+      } catch (error) {
+        setMessage(`长期关机失败：${error.message || error}`, true);
+      } finally {
+        if (controlCharacteristic) {
+          setControlButtons(true);
+        }
       }
     }
 
@@ -750,8 +783,8 @@
         setParameterStatus('SensorBias必须在-600～600 mV范围内。', true);
         return;
       }
-      if (samplePeriod < 1 || samplePeriod > 30000) {
-        setParameterStatus('采样周期必须在1～30000 ms范围内。', true);
+      if (samplePeriod < 10 || samplePeriod > 30000) {
+        setParameterStatus('采样周期必须在10～30000 ms范围内。', true);
         return;
       }
 
@@ -1106,6 +1139,7 @@
     elements.disconnectButton.addEventListener('click', disconnectBle);
     elements.startButton.addEventListener('click', startMeasurement);
     elements.stopButton.addEventListener('click', stopMeasurement);
+    elements.standbyButton.addEventListener('click', enterStandby);
     elements.refreshConfigButton.addEventListener('click', async () => {
       try {
         await getAmpConfig();
